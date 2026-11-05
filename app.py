@@ -6,7 +6,7 @@ st.set_page_config(page_title="Gestion de Stock - QR", page_icon="📦", layout=
 st.title("📦 Gestion de Stock (Google Sheets)")
 
 # Lien direct d'export CSV de votre Google Sheet
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1ik2XHR1hLLFZ39aZqjLnukpYVOAaPrZ1/export?format=csv&gid=1937426268"
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1ik2XHR1hLLFZ39aZqjLnukpYVOAaPrZ1/edit?usp=sharing&ouid=105683632513282575651&rtpof=true&sd=true"
 
 @st.cache_data(ttl=5)
 def charger_donnees():
