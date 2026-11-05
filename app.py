@@ -10,7 +10,9 @@ SHEET_URL = "https://docs.google.com/spreadsheets/d/1ik2XHR1hLLFZ39aZqjLnukpYVOA
 
 @st.cache_data(ttl=5)
 def charger_donnees():
-    return pd.read_csv(SHEET_URL)
+    # header=7 permet de dire à Pandas que les en-têtes de colonnes commencent à la 8ème ligne
+    df = pd.read_csv(SHEET_URL, header=7)
+    return df
 
 try:
     df = charger_donnees()
