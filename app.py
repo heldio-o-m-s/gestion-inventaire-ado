@@ -1,21 +1,23 @@
 import streamlit as st
 import pandas as pd
 
-# Configuration de la page mobile / Web
 st.set_page_config(page_title="Inventaire QR", page_icon="📦", layout="centered")
 
 FICHIER_EXCEL = "Tableau_Inventaire_Modele.xlsx"
 
-# Fonction pour charger les données
+# Fonction pour charger les données avec gestion d'erreur détaillée
+@st.cache_data
 def charger_donnees():
+    # Ouvre le fichier et lit la feuille "Inventaire"
     return pd.read_excel(FICHIER_EXCEL, sheet_name="Inventaire", header=7)
 
 st.title("📦 Gestion de Stock")
 
 try:
     df = charger_donnees()
+    st.success("Fichier Excel chargé avec succès !")
 except Exception as e:
-    st.error("❌ Impossible de charger le fichier Excel.")
+    st.error(f"❌ Erreur détaillée : {e}")
     st.stop()
 
 # Choix de l'opération
