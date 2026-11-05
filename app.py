@@ -6,41 +6,25 @@ st.set_page_config(page_title="Gestion de Stock - QR", page_icon="📦", layout=
 
 st.title("📦 Gestion de Stock (Google Sheets)")
 
-# Connexion Google Sheets
+# Connexion à Google Sheets via le connecteur Streamlit
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-@st.cache_data(ttl=5)
+@st.cache_data(ttl=5) # Rafraîchissement automatique toutes les 5 secondes
 def charger_donnees():
-    # Utilisation du paramètre de feuille explicite
+    # Lit les données de la feuille "Inventaire"
     return conn.read(worksheet="Inventaire", ttl=5)
 
 try:
-    data_brute = charger_donnees()
+    df = charger_donnees()
     
-    # Si le fichier lit les en-têtes plus bas, on nettoie pour trouver la bonne ligne
-    df = data_brute.copy()
-    
-    # Recherche de la ligne d'en-tête contenant 'Code ID' si elle est décalée
-    header_idx = None
-    for idx, row in df.iterrows():
-        if row.astype(str).str.contains('Code ID').any():
-            header_idx = idx
-            break
-            
-    if header_idx is not None and header_idx > 0:
-        df.columns = df.iloc[header_idx]
-        df = df.iloc[header_idx + 1:].reset_index(drop=True)
-
-    # Nettoyage des lignes vides basées sur Code ID
-    if 'Code ID' in df.columns:
-        df = df.dropna(subset=['Code ID'])
-
+    # Choix de l'opération
     operation = st.radio("Opération :", ["Mouvement de Stock (Entrée/Sortie)", "Consulter le Stock"], horizontal=True)
 
     if operation == "Mouvement de Stock (Entrée/Sortie)":
         type_mvt = st.selectbox("Type de mouvement :", ["SORTIE 🔴", "ENTRÉE 🟢"])
         
-        cat_liste = ["Toutes les zones"] + list(df['Catégorie'].dropna().unique()) if 'Catégorie' in df.columns else ["Toutes les zones"]
+        # Filtrer par catégorie / zone
+        cat_liste = ["Toutes les zones"] + list(df['Catégorie'].dropna().unique())
         cat_choisie = st.selectbox("Zone / Catégorie :", cat_liste)
         
         if cat_choisie != "Toutes les zones":
@@ -48,7 +32,8 @@ try:
         else:
             df_dispo = df
 
-        articles_dict = dict(zip(df_dispo['Code ID'].astype(str) + " - " + df_dispo['Article / Description'].astype(str), df_dispo['Code ID']))
+        # Sélection de l'article
+        articles_dict = dict(zip(df_dispo['Code ID'].astype(str) + " - " + df_dispo['Article / Description'], df_dispo['Code ID']))
         article_selectionne = st.selectbox("Choisir l'article :", list(articles_dict.keys()))
         
         if article_selectionne:
@@ -61,7 +46,7 @@ try:
             
             if st.button("Valider la mise à jour"):
                 idx = df[df['Code ID'] == code_id].index[0]
-                stock_actuel = int(pd.to_numeric(str(df.loc[idx, 'Qté en Stock']).replace(',', '.'), errors='coerce') or 0)
+                stock_actuel = int(df.loc[idx, 'Qté en Stock'])
                 
                 if "SORTIE" in type_mvt:
                     nouveau_stock = max(0, stock_actuel - quantite)
@@ -78,7 +63,7 @@ try:
                 else:
                     df.loc[idx, 'État / Statut'] = 'En Stock'
                     
-                # ÉCRITURE DANS LE GOOGLE SHEETS
+                # ÉCRITURE EN DIRECT DANS GOOGLE SHEETS
                 conn.update(worksheet="Inventaire", data=df)
                 st.cache_data.clear()
                 
@@ -96,8 +81,7 @@ try:
         else:
             df_affiche = df
             
-        cols_a_afficher = [c for c in ['Code ID', 'Article / Description', 'Catégorie', 'Qté en Stock', 'État / Statut'] if c in df.columns]
-        st.dataframe(df_affiche[cols_a_afficher], use_container_width=True)
+        st.dataframe(df_affiche[['Code ID', 'Article / Description', 'Catégorie', 'Qté en Stock', 'État / Statut']], use_container_width=True)
 
 except Exception as e:
-    st.error(f"❌ Erreur : {e}")
+    st.error(f"❌ Erreur de connexion ou de chargement Google Sheets : {e}")
