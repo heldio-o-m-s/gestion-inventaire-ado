@@ -1,37 +1,23 @@
 import streamlit as st
 import pandas as pd
+from streamlit_gsheets import GSheetsConnection
 
 st.set_page_config(page_title="Gestion de Stock - QR", page_icon="📦", layout="centered")
 
 st.title("📦 Gestion de Stock (Google Sheets)")
 
-# Lien d'export CSV direct propre pour la feuille "Inventaire"
-SPREADSHEET_ID = "1ik2XHR1hLLFZ39aZqjLnukpYVOAaPrZ1"
-SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=Inventaire"
+# Établir la connexion avec le connecteur officiel Google Sheets
+conn = st.connection("gsheets", type=GSheetsConnection)
 
 @st.cache_data(ttl=5)
 def charger_donnees():
-    # Lecture directe du flux CSV généré par Google Sheets
-    df = pd.read_csv(SHEET_URL)
-    
-    # Trouver la ligne contenant les vrais en-têtes (Code ID)
-    header_idx = None
-    for idx, row in df.iterrows():
-        if row.astype(str).str.contains('Code ID').any():
-            header_idx = idx
-            break
-            
-    if header_idx is not None:
-        # Re-formater le DataFrame avec la bonne ligne d'en-tête
-        df.columns = df.iloc[header_idx]
-        df = df.iloc[header_idx + 1:].reset_index(drop=True)
-        
-    return df
+    # Lit la feuille "Inventaire" en prenant la ligne 8 comme en-tête (header=7)
+    return conn.read(worksheet="Inventaire", ttl=5, header=7)
 
 try:
     df = charger_donnees()
     
-    # Supprimer les lignes où 'Code ID' n'est pas renseigné
+    # Nettoyage des lignes vides
     if 'Code ID' in df.columns:
         df = df.dropna(subset=['Code ID'])
 
@@ -60,7 +46,6 @@ try:
             quantite = st.number_input("Quantité :", min_value=1, step=1, value=1)
             
             if st.button("Valider la mise à jour"):
-                # Simulation / Mise à jour locale
                 idx = df[df['Code ID'] == code_id].index[0]
                 stock_actuel = int(pd.to_numeric(df.loc[idx, 'Qté en Stock'], errors='coerce') or 0)
                 
@@ -68,8 +53,23 @@ try:
                     nouveau_stock = max(0, stock_actuel - quantite)
                 else:
                     nouveau_stock = stock_actuel + quantite
+                    
+                df.loc[idx, 'Qté en Stock'] = nouveau_stock
                 
-                st.success(f"✅ Entrée/Sortie validée pour **{ligne['Article / Description']}** ! Nouveau stock théorique : **{nouveau_stock}**")
+                # Mise à jour automatique du statut
+                if nouveau_stock <= 0:
+                    df.loc[idx, 'État / Statut'] = 'Épuisé'
+                elif nouveau_stock <= 2:
+                    df.loc[idx, 'État / Statut'] = 'Stock Bas'
+                else:
+                    df.loc[idx, 'État / Statut'] = 'En Stock'
+                    
+                # 🔄 ÉCRITURE AUTOMATIQUE DANS LE GOOGLE SHEETS
+                conn.update(worksheet="Inventaire", data=df)
+                st.cache_data.clear()
+                
+                st.success(f"✅ Google Sheets mis à jour ! Nouveau stock pour '{ligne['Article / Description']}' : **{nouveau_stock}**")
+                st.rerun()
 
     else:
         st.subheader("📋 Liste des articles en stock")
@@ -86,4 +86,4 @@ try:
         st.dataframe(df_affiche[cols_a_afficher], use_container_width=True)
 
 except Exception as e:
-    st.error(f"❌ Erreur de chargement : {e}")
+    st.error(f"❌ Erreur : {e}")
