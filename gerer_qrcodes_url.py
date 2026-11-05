@@ -4,7 +4,7 @@ import os
 # Mettez ici le lien de votre application Streamlit 
 # (Par exemple, le lien réseau local fourni par Streamlit lorsque vous lancez l'app)
 # Ex: "http://192.168.1.15:8501" ou votre lien web public s'il est hébergé en ligne.
-URL_APPLICATION = "http://10.43.3.13:8502"
+URL_APPLICATION = "https://gestion-inventaire-ado-dwt4jg34bot6hrqgfwjqcb.streamlit.app/"
 
 # Dossier où seront sauvegardées les images des QR Codes
 DOSSIER_SORTIE = "qrcodes_url_application"
