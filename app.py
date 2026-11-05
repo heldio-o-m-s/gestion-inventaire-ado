@@ -6,18 +6,32 @@ st.set_page_config(page_title="Gestion de Stock - QR", page_icon="📦", layout=
 
 st.title("📦 Gestion de Stock (Google Sheets)")
 
-# Établir la connexion avec le connecteur officiel Google Sheets
+# Connexion Google Sheets
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 @st.cache_data(ttl=5)
 def charger_donnees():
-    # Lit la feuille "Inventaire" en prenant la ligne 8 comme en-tête (header=7)
-    return conn.read(worksheet="Inventaire", ttl=5, header=7)
+    # Utilisation du paramètre de feuille explicite
+    return conn.read(worksheet="Inventaire", ttl=5)
 
 try:
-    df = charger_donnees()
+    data_brute = charger_donnees()
     
-    # Nettoyage des lignes vides
+    # Si le fichier lit les en-têtes plus bas, on nettoie pour trouver la bonne ligne
+    df = data_brute.copy()
+    
+    # Recherche de la ligne d'en-tête contenant 'Code ID' si elle est décalée
+    header_idx = None
+    for idx, row in df.iterrows():
+        if row.astype(str).str.contains('Code ID').any():
+            header_idx = idx
+            break
+            
+    if header_idx is not None and header_idx > 0:
+        df.columns = df.iloc[header_idx]
+        df = df.iloc[header_idx + 1:].reset_index(drop=True)
+
+    # Nettoyage des lignes vides basées sur Code ID
     if 'Code ID' in df.columns:
         df = df.dropna(subset=['Code ID'])
 
@@ -47,7 +61,7 @@ try:
             
             if st.button("Valider la mise à jour"):
                 idx = df[df['Code ID'] == code_id].index[0]
-                stock_actuel = int(pd.to_numeric(df.loc[idx, 'Qté en Stock'], errors='coerce') or 0)
+                stock_actuel = int(pd.to_numeric(str(df.loc[idx, 'Qté en Stock']).replace(',', '.'), errors='coerce') or 0)
                 
                 if "SORTIE" in type_mvt:
                     nouveau_stock = max(0, stock_actuel - quantite)
@@ -64,7 +78,7 @@ try:
                 else:
                     df.loc[idx, 'État / Statut'] = 'En Stock'
                     
-                # 🔄 ÉCRITURE AUTOMATIQUE DANS LE GOOGLE SHEETS
+                # ÉCRITURE DANS LE GOOGLE SHEETS
                 conn.update(worksheet="Inventaire", data=df)
                 st.cache_data.clear()
                 
